@@ -6,13 +6,19 @@
 void predict_server(char * info[MAX_INFO_NUM], char * data[MAX_DATA_NUM], int data_num, char * filename)
 {
 	// ��Ҫ���������
-	char * result_file = (char *)"17\n\n0 8 0 20";
+	char * result_file = (char *)malloc(sizeof(char) * MAX_DATA_NUM);
 	Info information = parseInfo(info);
 	Record **record = parseRecord(data, data_num);
+	ResultLine *r = NULL;
+	int numOfMachine = 0;
 
-	int * result = predict_vm(information, record, data_num);
-	for(int i = 0; i < 16; ++i)
-		printf("%d ", result[i]);
+	int * vm = predict_vm(information, record, data_num);
+	/*for(int i = 0; i < 16; ++i)
+		printf("%d ", vm[i]);
+	printf("\n");*/
+	print_vm(result_file, vm, information);
+	r = vm_placement(vm, information, numOfMachine);
+	print_placement(result_file, numOfMachine, r);
 	// ֱ�ӵ�������ļ��ķ��������ָ���ļ���(ps��ע���ʽ����ȷ�ԣ�����н⣬��һ��ֻ��һ�����ݣ��ڶ���Ϊ�գ������п�ʼ���Ǿ�������ݣ�����֮����һ���ո�ָ�)
 	write_result(result_file, filename);
 }
@@ -21,11 +27,10 @@ int* predict_vm(Info info, Record **record, int data_num) {
 	int *vm = (int*)malloc(sizeof(int) * 16); 
 	int test_time = info.m_endTime - info.m_startTime;
 	int train_time = record[data_num-1]->m_time - record[0]->m_time;
-	printf("test_time %d, train_time %d\n", test_time, train_time);
-	int sum = 0;
-	for (int i=0; i<data_num; i++){
-		for (int j=0; j<info.m_numOfVM; j++)
-			if (record[i]->m_idOfVM==info.m_vm[j]->m_id) {
+	//printf("test_time %d, train_time %d\n", test_time, train_time);	
+	for (int i = 0; i < data_num; i++){
+		for (int j = 0; j < info.m_numOfVM; j++)
+			if (record[i]->m_idOfVM == info.m_vm[j]->m_id) {
 				vm[j]++;
 				break;
 			}
@@ -35,6 +40,78 @@ int* predict_vm(Info info, Record **record, int data_num) {
 		vm[j] = vm[j]*test_time/train_time;
 	}
 	return vm;
+}
+
+void print_vm(char *buffer, int *vm, Info info){
+	int count = 0,offset = 0;	
+	for (int i = 0; i < info.m_numOfVM; i++){
+		if (vm[i] > 0){
+			count += vm[i];
+		}
+	}
+	offset = sprintf(buffer, "%d\n", count);
+	for (int i = 0; i < info.m_numOfVM; i++){
+		offset += sprintf(buffer + offset, "flavor%d %d\n", info.m_vm[i]->m_id, vm[i]);		
+	}
+	offset += sprintf(buffer + offset, "\n");
+	//printf("%s",buffer);	
+}
+
+ResultLine* vm_placement(int *vm, Info info, int &numOfMachine){
+	int mem_cnt = 0, cpu_cnt = 0, m_cnt = 0;
+	ResultLine *r = (ResultLine*)malloc(sizeof(ResultLine) * MAX_DATA_NUM);	
+	//printf("cpu:%d mem:%d\n",info.m_machine.m_cpu, info.m_machine.m_mem);
+	for ( int i = 0; i < info.m_numOfVM; i++){
+		if (vm[i] > 0){
+			int n = vm[i];
+			int vm_mem = 0, vm_cpu = 0;
+			/*for (int j = 0; j < info.m_numOfVM; j++){
+				if( i == info.m_vm[j]->m_id){*/
+			vm_mem = info.m_vm[i]->m_mem;
+			vm_cpu = info.m_vm[i]->m_cpu;					
+				//}
+			//}
+			//printf("vm_mem:%d vm_cpu:%d\n", vm_mem, vm_cpu);
+			for(int j = 0; j < n;){
+				if (mem_cnt + vm_mem <= info.m_machine.m_mem * 1024 && cpu_cnt + vm_cpu <= info.m_machine.m_cpu){
+					mem_cnt += vm_mem;
+					cpu_cnt += vm_cpu;		
+					//printf("memcnt:%d cputcnt:%d\n", mem_cnt, cpu_cnt);					
+					r[m_cnt].m_pair[r[m_cnt].m_numOfPair].m_id = info.m_vm[i]->m_id;
+					r[m_cnt].m_pair[r[m_cnt].m_numOfPair].m_numOfVM++;
+					j++;
+				}else{			
+					if(r[m_cnt].m_pair[r[m_cnt].m_numOfPair].m_numOfVM)	r[m_cnt].m_numOfPair++;							
+					m_cnt++;
+					mem_cnt = 0;
+					cpu_cnt = 0;					
+				}
+			}
+			r[m_cnt].m_numOfPair++;
+		}
+	}
+	
+	numOfMachine = m_cnt + 1;
+	return r;
+	
+}
+
+void print_placement(char * buffer, int numOfMachine, ResultLine * r){	
+	int offset = strlen(buffer);
+	//printf("len_part:%d\n",offset);
+	//printf("%s\n", buffer);
+	offset += sprintf(buffer + offset, "%d\n", numOfMachine);
+	//printf("%d\n", numOfMachine);
+	for(int i = 0; i < numOfMachine; i++){
+		offset += sprintf(buffer + offset, "%d", i+1);		
+		for(int j = 0; j < r[i].m_numOfPair; j++){
+			//printf("%d\n",r[i].m_numOfPair);
+			offset += sprintf(buffer + offset," flavor%d %d", r[i].m_pair[j].m_id, r[i].m_pair[j].m_numOfVM);
+			//printf("%d %d\n",r[i].m_pair[j].m_id, r[i].m_pair[j].m_numOfVM);
+		}
+		offset += sprintf(buffer + offset, "\n");
+	}
+	//printf("%s", buffer);
 }
 
 Machine parseMachine(char *machine){

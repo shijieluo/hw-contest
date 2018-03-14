@@ -1,0 +1,3 @@
+/home/luoshijie/hw-contest/sdk-gcc/build/CMakeFiles/edit_cache.dir
+/home/luoshijie/hw-contest/sdk-gcc/build/CMakeFiles/rebuild_cache.dir
+/home/luoshijie/hw-contest/sdk-gcc/build/CMakeFiles/ecs.dir

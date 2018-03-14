@@ -35,6 +35,16 @@ typedef struct{
     time_t m_time;
 } Record;
 
+typedef struct{
+    int m_id;
+    int m_numOfVM;
+}Pair;
+
+typedef struct{
+    Pair m_pair[16];
+    int m_numOfPair;
+}ResultLine;
+
 void predict_server(char * info[MAX_INFO_NUM], char * data[MAX_DATA_NUM], int data_num, char * filename);
 
 Info parseInfo(char *info[MAX_INFO_NUM]);
@@ -48,5 +58,11 @@ time_t parseTime(char *time);
 VirtualMachine* parseVirtualMachine(char *vm);
 
 int* predict_vm(Info info, Record **record, int data_num);
+
+void print_vm(char *buffer, int *vm, Info info);
+
+ResultLine* vm_placement(int *vm, Info info, int &numOfMachine);
+
+void print_placement(char *buffer, int numOfMachine, ResultLine * r);
 
 #endif
