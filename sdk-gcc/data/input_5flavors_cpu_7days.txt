@@ -1,13 +1,16 @@
-56 6 1200
+0 0 1200
 
-5
-flavor1 1 1024
+8
+flavor15 1 1024
 flavor2 1 2048
-flavor3 1 4096
-flavor4 2 2048
-flavor5 2 4096
+flavor3 1 2048
+flavor4 1 2048
+flavor5 1 2048
+flavor6 1 2048
+flavor7 1 4096
+flavor8 2 2048
 
 CPU
 
 2015-02-20 00:00:00
-2015-02-27 00:00:00
+2015-03-15 00:00:00
