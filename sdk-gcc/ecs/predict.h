@@ -59,9 +59,9 @@ VirtualMachine* parseVirtualMachine(char *vm);
 
 int* predict_vm(Info info, Record **record, int data_num);
 
-void print_vm(char *buffer, int *vm, Info info);
+int print_vm(char *buffer, int *vm, Info info);
 
-ResultLine* vm_placement(int *vm, Info info, int &numOfMachine);
+ResultLine* vm_placement(int *vm, Info info, int &numOfMachine, int count);
 
 void print_placement(char *buffer, int numOfMachine, ResultLine * r);
 

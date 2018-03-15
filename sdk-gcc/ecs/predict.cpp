@@ -16,8 +16,8 @@ void predict_server(char * info[MAX_INFO_NUM], char * data[MAX_DATA_NUM], int da
 	/*for(int i = 0; i < 16; ++i)
 		printf("%d ", vm[i]);
 	printf("\n");*/
-	print_vm(result_file, vm, information);
-	r = vm_placement(vm, information, numOfMachine);
+	int count = print_vm(result_file, vm, information);
+	r = vm_placement(vm, information, numOfMachine, count);
 	print_placement(result_file, numOfMachine, r);
 	// ֱ�ӵ�������ļ��ķ��������ָ���ļ���(ps��ע���ʽ����ȷ�ԣ�����н⣬��һ��ֻ��һ�����ݣ��ڶ���Ϊ�գ������п�ʼ���Ǿ�������ݣ�����֮����һ���ո�ָ�)
 	write_result(result_file, filename);
@@ -42,7 +42,7 @@ int* predict_vm(Info info, Record **record, int data_num) {
 	return vm;
 }
 
-void print_vm(char *buffer, int *vm, Info info){
+int print_vm(char *buffer, int *vm, Info info){
 	int count = 0,offset = 0;	
 	for (int i = 0; i < info.m_numOfVM; i++){
 		if (vm[i] > 0){
@@ -54,19 +54,88 @@ void print_vm(char *buffer, int *vm, Info info){
 		offset += sprintf(buffer + offset, "flavor%d %d\n", info.m_vm[i]->m_id, vm[i]);		
 	}
 	offset += sprintf(buffer + offset, "\n");
-	//printf("%s",buffer);	
+	//printf("%s",buffer);
+	return count;	
 }
 
-ResultLine* vm_placement(int *vm, Info info, int &numOfMachine){
+ResultLine* vm_placement(int *vm, Info info, int &numOfMachine, int count){
 	int mem_cnt = 0, cpu_cnt = 0, m_cnt = 0;
-	ResultLine *r = (ResultLine*)malloc(sizeof(ResultLine) * MAX_DATA_NUM);	
+	ResultLine *r = (ResultLine*)malloc(sizeof(ResultLine) * MAX_DATA_NUM);
+	VirtualMachine vm_one[count];
+	int cnt = 0;
+	// expand vm to vm_one
+	for (int i=0; i<info.m_numOfVM; i++){
+		for (int j=0; j<vm[i]; j++){
+			vm_one[cnt].m_id = info.m_vm[i]->m_id;
+    			vm_one[cnt].m_cpu = info.m_vm[i]->m_cpu;
+    			vm_one[cnt].m_mem = info.m_vm[i]->m_mem/1024;
+			cnt++;
+		}
+	}
+	int next[count][info.m_machine.m_cpu+1][info.m_machine.m_mem+1]; //next[i] means the next one of vm_one[i] is planned
+	int arrange[count]; //arrange[i] means vm_one[i] is arranged or not
+	for (int i = 0; i < count; i++)
+		arrange[i] = 0;
+
+	double utility[count+1][info.m_machine.m_cpu+1][info.m_machine.m_mem+1];
+
+	for (int i = 0; i < count; i++)
+		printf("%d %d %d %d \n", i, vm_one[i].m_id, vm_one[i].m_cpu, vm_one[i].m_mem);
+	int count_backup = count;	
+	while (count_backup > 0) {
+		for (int k=0; k<count; k++)
+        		for (int i = 0; i <= info.m_machine.m_cpu; i++)
+               			for (int j = 0; j <= info.m_machine.m_mem; j++)
+                        		utility[k][i][j] = 0;
+		printf("%d %d %d %d %d %d\n", arrange[0], arrange[1], arrange[2], arrange[3], arrange[4], arrange[5]);
+		// find the max utility at present
+		for (int i = count-1; i>=0; i--) {
+			if (arrange[i]) continue;
+			for (int j = count; j>i; j--)
+				for (int k = vm_one[i].m_cpu; k <= info.m_machine.m_cpu; k++)
+					for (int l = vm_one[i].m_mem; l <= info.m_machine.m_mem; l++)
+						if (utility[j][k-vm_one[i].m_cpu][l-vm_one[i].m_mem]+1.0*vm_one[i].m_cpu/info.m_machine.m_cpu+1.0*vm_one[i].m_mem/info.m_machine.m_mem > utility[i][k][l]) {
+				utility[i][k][l] = utility[j][k-vm_one[i].m_cpu][l-vm_one[i].m_mem]+1.0*vm_one[i].m_cpu/info.m_machine.m_cpu+1.0*vm_one[i].m_mem/info.m_machine.m_mem;
+				next[i][k][l] = j;
+			}
+		}
+		int index;
+		double maxutility = 0;
+		for (int i = 0; i < count; i++) {
+		//printf("%d %f %d\n", i, utility[i][info.m_machine.m_cpu][info.m_machine.m_mem], next[i][info.m_machine.m_cpu][info.m_machine.m_mem]);
+		if (arrange[i]==0 && utility[i][info.m_machine.m_cpu][info.m_machine.m_mem] > maxutility) {
+				maxutility = utility[i][info.m_machine.m_cpu][info.m_machine.m_mem]; 
+				index = i;
+			}
+		}
+		// delete the selected vm_one, apply for new physical machine
+		int cpu_present = info.m_machine.m_cpu;
+		int mem_present = info.m_machine.m_mem;
+		while (index < count) {
+			printf("index = %d\n", index);
+			arrange[index] = 1;
+			if(r[m_cnt].m_numOfPair==0 || r[m_cnt].m_pair[r[m_cnt].m_numOfPair-1].m_id != vm_one[index].m_id) {
+				r[m_cnt].m_numOfPair++;
+				r[m_cnt].m_pair[r[m_cnt].m_numOfPair-1].m_id = vm_one[index].m_id;
+			}
+                        r[m_cnt].m_pair[r[m_cnt].m_numOfPair-1].m_numOfVM++;
+			int tmp = index;
+			index = next[index][cpu_present][mem_present];
+			cpu_present -= vm_one[tmp].m_cpu;
+			mem_present -= vm_one[tmp].m_mem;
+			count_backup--;
+		}
+		m_cnt++;
+	
+	}
+	//printf("count = %d, cnt = %d\n", count, cnt);
 	//printf("cpu:%d mem:%d\n",info.m_machine.m_cpu, info.m_machine.m_mem);
-	for ( int i = 0; i < info.m_numOfVM; i++){
+	/*for ( int i = 0; i < info.m_numOfVM; i++){
 		if (vm[i] > 0){
 			int n = vm[i];
 			int vm_mem = 0, vm_cpu = 0;
-			/*for (int j = 0; j < info.m_numOfVM; j++){
-				if( i == info.m_vm[j]->m_id){*/
+			//for (int j = 0; j < info.m_numOfVM; j++){
+			//	if( i == info.m_vm[j]->m_id){
 			vm_mem = info.m_vm[i]->m_mem;
 			vm_cpu = info.m_vm[i]->m_cpu;					
 				//}
@@ -90,8 +159,9 @@ ResultLine* vm_placement(int *vm, Info info, int &numOfMachine){
 			r[m_cnt].m_numOfPair++;
 		}
 	}
+	*/	
+	numOfMachine = m_cnt;
 	
-	numOfMachine = m_cnt + 1;
 	return r;
 	
 }
